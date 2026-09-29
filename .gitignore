@@ -1,0 +1,25 @@
+trash/
+work/*
+!work/README.md
+*.docx
+
+# Excel lock files (created while workbook is open)
+~$*
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# No Python scripts under documentation
+docs/**/*.py
+
+# Build / agent temporary artifacts (PyInstaller, dumps)
+tmp/
+*.exe
+*.pkg
+*.pyz
