@@ -1,10 +1,149 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" xmlns:loc="http://documentat.io"
     xmlns:xs="http://www.w3.org/2001/XMLSchema"
     xpath-default-namespace="http://docbook.org/ns/docbook" exclude-result-prefixes="#all"
     version="2.0">
 
     <xsl:output method="html" indent="yes"/>
+
+
+    <!-- 
+        Utilities
+    -->
+    
+    <xsl:template name="LFCR">
+        <xsl:text>&#10;&#13;</xsl:text>
+    </xsl:template>
+    
+    
+    <!-- 
+        Detecting element levels 
+    -->
+
+    <xsl:template match="section/title" mode="level">
+        <xsl:value-of select="count(ancestor::section) - 1"/>
+    </xsl:template>
+
+    <xsl:template match="*" mode="level">
+        <xsl:value-of select="1"/>
+    </xsl:template>
+
+    <xsl:function name="loc:level" as="xs:integer">
+
+        <xsl:param name="element"/>
+
+        <xsl:apply-templates select="$element" mode="level"/>
+
+    </xsl:function>
+
+
+    <!-- 
+        Detecting output style names 
+    -->
+    
+    <xsl:template match="para" mode="styleName">
+        <xsl:text>Normal</xsl:text>
+    </xsl:template>
+
+    <xsl:template match="itemizedlist" mode="styleName">
+        <xsl:text>Scroll List Bullet</xsl:text>
+    </xsl:template>
+
+    <xsl:template match="orderedlist" mode="styleName">
+        <xsl:text>Scroll List Number</xsl:text>
+    </xsl:template>
+
+    <xsl:template match="section/title" mode="styleName">
+        <xsl:value-of select="concat('Heading ', loc:level(.))"/>
+    </xsl:template>
+
+    <xsl:template match="*" mode="styleName"/>
+
+
+    <!-- 
+        Assembling anchore names for output styles 
+    -->
+    
+    <xsl:function name="loc:escapeStyleName">
+
+        <xsl:param name="styleName"/>
+
+        <xsl:variable name="stage1" select="replace($styleName, '_', '__')"/>
+
+        <xsl:variable name="stage2" select="replace($stage1, ' ', '_s')"/>
+
+        <xsl:value-of select="$stage2"/>
+
+    </xsl:function>
+
+
+    <xsl:function name="loc:styleAnchorName">
+
+        <xsl:param name="element"/>
+
+        <xsl:param name="styleName"/>
+
+        <xsl:variable name="escapedStyleName" select="loc:escapeStyleName($styleName)"/>
+
+        <xsl:value-of select="concat('style_', $escapedStyleName, '_', generate-id($element))"/>
+
+    </xsl:function>
+
+
+    <!-- 
+        Wrapping an output element into an anchor that delivers a style name 
+    -->
+
+    <xsl:template match="*" mode="hasStyleName" as="xs:boolean">
+        
+        <xsl:variable name="styleName">
+            <xsl:apply-templates select="." mode="styleName"/>
+        </xsl:variable>
+        
+        <xsl:sequence select="$styleName != ''"/>
+        
+    </xsl:template>
+    
+   
+    <xsl:function name="loc:hasStyleName" as="xs:boolean">
+        
+        <xsl:param name="element"/>
+        
+        <xsl:apply-templates select="$element" mode="hasStyleName"/>
+        
+    </xsl:function>
+    
+    
+    <xsl:template match="*" mode="styleAnchor">
+
+        <xsl:param name="content"/>
+
+        <xsl:param name="styleName"/>
+
+        <xsl:choose>
+
+            <xsl:when test="loc:hasStyleName(.)">
+                <a name="{loc:styleAnchorName(., $styleName)}">
+                    <xsl:copy-of select="$content"/>
+                </a>
+            </xsl:when>
+
+            <xsl:otherwise>
+                <xsl:copy-of select="$content"/>
+            </xsl:otherwise>
+
+        </xsl:choose>
+
+    </xsl:template>
+
+
+    <!-- 
+        Assembling output elements
+    -->
+
+    <xsl:template match="node()[name()='']">
+        <xsl:value-of select="normalize-space(.)"/>
+    </xsl:template>
 
 
     <xsl:template match="emphasis">
@@ -16,47 +155,94 @@
     </xsl:template>
 
 
+    <xsl:template match="listitem/para">
+
+        <xsl:apply-templates/>
+
+    </xsl:template>
+
+
     <xsl:template match="listitem">
-        
+
         <li>
             <xsl:apply-templates/>
         </li>
-        
+
     </xsl:template>
-    
-    
+
+
     <xsl:template match="orderedlist">
-        
-        <ol>
-            <xsl:apply-templates/>
-        </ol>
-        
+
+        <xsl:apply-templates select="." mode="styleAnchor">
+
+            <xsl:with-param name="content">
+                <ol>
+                    <xsl:apply-templates/>
+                </ol>
+            </xsl:with-param>
+
+            <xsl:with-param name="styleName">
+                <xsl:apply-templates select="." mode="styleName"/>
+            </xsl:with-param>
+
+        </xsl:apply-templates>
+
     </xsl:template>
-    
-    
+
+
     <xsl:template match="itemizedlist">
-        
-        <ul>
-            <xsl:apply-templates/>
-        </ul>
-        
+
+        <xsl:apply-templates select="." mode="styleAnchor">
+
+            <xsl:with-param name="content">
+                <ul>
+                    <xsl:apply-templates/>
+                </ul>
+            </xsl:with-param>
+
+            <xsl:with-param name="styleName">
+                <xsl:apply-templates select="." mode="styleName"/>
+            </xsl:with-param>
+
+        </xsl:apply-templates>
+
     </xsl:template>
 
 
     <xsl:template match="para">
-        
-        <p>
-            <xsl:apply-templates/>
-        </p>
-        
+
+        <xsl:apply-templates select="." mode="styleAnchor">
+
+            <xsl:with-param name="content">
+                <p>
+                    <xsl:apply-templates/>
+                </p>
+            </xsl:with-param>
+
+            <xsl:with-param name="styleName">
+                <xsl:apply-templates select="." mode="styleName"/>
+            </xsl:with-param>
+
+        </xsl:apply-templates>
+
     </xsl:template>
 
 
-    <xsl:template match="title">
+    <xsl:template match="section/title">
 
-        <p>
-            <xsl:apply-templates/>
-        </p>
+        <xsl:apply-templates select="." mode="styleAnchor">
+
+            <xsl:with-param name="content">
+                <xsl:element name="{concat('h', loc:level(.))}">
+                    <xsl:apply-templates/>
+                </xsl:element>
+            </xsl:with-param>
+
+            <xsl:with-param name="styleName">
+                <xsl:apply-templates select="." mode="styleName"/>
+            </xsl:with-param>
+
+        </xsl:apply-templates>
 
     </xsl:template>
 
@@ -68,14 +254,14 @@
         </td>
 
     </xsl:template>
-    
-    
+
+
     <xsl:template match="thead/row/entry">
-        
+
         <th>
             <xsl:apply-templates/>
         </th>
-        
+
     </xsl:template>
 
 
@@ -89,16 +275,16 @@
 
 
     <xsl:template match="colspec"/>
-    
 
-    <xsl:template match="tgroup|thead|tbody">
+
+    <xsl:template match="tgroup | thead | tbody">
 
         <xsl:apply-templates/>
 
     </xsl:template>
 
 
-    <xsl:template match="informaltable">
+    <xsl:template match="informaltable | table">
 
         <table>
             <xsl:apply-templates/>
@@ -106,12 +292,17 @@
 
     </xsl:template>
 
-    <xsl:template match="section">
 
-        <div>
-            <xsl:apply-templates/>
-        </div>
+    <xsl:template match="section/section">
 
+        <xsl:apply-templates/>
+
+    </xsl:template>
+    
+    <xsl:template match="article/section">
+        
+        <xsl:apply-templates select="section"/>
+        
     </xsl:template>
 
 
@@ -145,10 +336,9 @@
     </xsl:template>
 
 
-    <xsl:template name="LFCR">
-        <xsl:text>&#10;&#13;</xsl:text>
-    </xsl:template>
-
+    <!--
+        Creating an output document
+    -->
 
     <xsl:template name="doctypeHtml5">
         <xsl:text disable-output-escaping="yes"><![CDATA[<!DOCTYPE html>]]></xsl:text>
