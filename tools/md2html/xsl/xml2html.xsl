@@ -10,12 +10,12 @@
     <!-- 
         Utilities
     -->
-    
+
     <xsl:template name="LFCR">
         <xsl:text>&#10;&#13;</xsl:text>
     </xsl:template>
-    
-    
+
+
     <!-- 
         Detecting element levels 
     -->
@@ -40,7 +40,7 @@
     <!-- 
         Detecting output style names 
     -->
-    
+
     <xsl:template match="para" mode="styleName">
         <xsl:text>Normal</xsl:text>
     </xsl:template>
@@ -63,7 +63,7 @@
     <!-- 
         Assembling anchore names for output styles 
     -->
-    
+
     <xsl:function name="loc:escapeStyleName">
 
         <xsl:param name="styleName"/>
@@ -95,25 +95,25 @@
     -->
 
     <xsl:template match="*" mode="hasStyleName" as="xs:boolean">
-        
+
         <xsl:variable name="styleName">
             <xsl:apply-templates select="." mode="styleName"/>
         </xsl:variable>
-        
+
         <xsl:sequence select="$styleName != ''"/>
-        
+
     </xsl:template>
-    
-   
+
+
     <xsl:function name="loc:hasStyleName" as="xs:boolean">
-        
+
         <xsl:param name="element"/>
-        
+
         <xsl:apply-templates select="$element" mode="hasStyleName"/>
-        
+
     </xsl:function>
-    
-    
+
+
     <xsl:template match="*" mode="styleAnchor">
 
         <xsl:param name="content"/>
@@ -141,7 +141,7 @@
         Assembling output elements
     -->
 
-    <xsl:template match="node()[name()='']">
+    <xsl:template match="node()[name() = '']">
         <xsl:value-of select="normalize-space(.)"/>
     </xsl:template>
 
@@ -298,11 +298,40 @@
         <xsl:apply-templates/>
 
     </xsl:template>
-    
+
+
+    <xsl:function name="loc:isFrontmatter" as="xs:boolean">
+
+        <xsl:param name="sectionElement"/>
+
+        <xsl:choose>
+            <xsl:when test="upper-case($sectionElement/title) = 'ЛИСТ СОГЛАСОВАНИЯ'">
+                <xsl:sequence select="true()"/>
+            </xsl:when>
+            <xsl:when test="upper-case($sectionElement/title) = 'ЛИСТ РЕГИСТРАЦИИ ИЗМЕНЕНИЙ'">
+                <xsl:sequence select="true()"/>
+            </xsl:when>
+            <xsl:when test="upper-case($sectionElement/title) = 'АННОТАЦИЯ'">
+                <xsl:sequence select="true()"/>
+            </xsl:when>
+            <xsl:otherwise>
+                <xsl:sequence select="false()"/>
+            </xsl:otherwise>
+        </xsl:choose>
+
+    </xsl:function>
+
+
     <xsl:template match="article/section">
-        
-        <xsl:apply-templates select="section"/>
-        
+
+        <a name="part_frontmatter">
+            <xsl:apply-templates select="section[loc:isFrontmatter(.)]"/>
+        </a>
+
+        <a name="part_main">
+            <xsl:apply-templates select="section[not(loc:isFrontmatter(.))]"/>
+        </a>
+
     </xsl:template>
 
 

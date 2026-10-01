@@ -10,3 +10,5 @@ set pandocExe=C:\Program Files\Pandoc\pandoc.exe
 set md2htmlBat=%tools%\md2html\md2html.bat
 set saxonJar=c:\Saxon\saxon9.jar 
 set xml2htmlXsl=%tools%\md2html\xsl\xml2html.xsl
+
+set html2docxVbs=%tools%\html2docx\vbs\bookmarx.vbs
