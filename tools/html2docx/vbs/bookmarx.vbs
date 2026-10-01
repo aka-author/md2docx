@@ -276,24 +276,15 @@ Sub PastePartFromHtmlDoc(w, htmlDoc, doc, partName)
     Exit Sub
   End If
 
-  htmlDoc.Range(srcStart, srcEnd).Copy
-  If Err.Number <> 0 Then
-    LogMsg "ERROR", "Part " & partName & ": copy failed Err=" & Err.Number & " " & Err.Description
-    Err.Clear
-    Exit Sub
-  End If
-
   Set rng = doc.Range(insertStart, insertEnd)
-  rng.Delete
-  Set rng = doc.Range(insertStart, insertStart)
-  rng.Paste
+  rng.FormattedText = htmlDoc.Range(srcStart, srcEnd).FormattedText
   If Err.Number <> 0 Then
-    LogMsg "ERROR", "Part " & partName & ": paste failed Err=" & Err.Number & " " & Err.Description
+    LogMsg "ERROR", "Part " & partName & ": insert failed Err=" & Err.Number & " " & Err.Description
     Err.Clear
     Exit Sub
   End If
 
-  LogMsg "INFO", "Part " & partName & ": paste OK"
+  LogMsg "INFO", "Part " & partName & ": insert OK"
 End Sub
 
 Function NextPartStart(htmlDoc, afterStart)
@@ -308,6 +299,123 @@ Function NextPartStart(htmlDoc, afterStart)
   Next
   NextPartStart = best
 End Function
+
+'-----------------------------------------------------------
+' Style bookmarks
+'-----------------------------------------------------------
+
+Const wdStyleTypeParagraph = 1
+Const wdStyleTypeCharacter = 2
+Const wdMainTextStory = 1
+
+Function IsStyleBookmarkName(name)
+  Dim base
+  IsStyleBookmarkName = False
+  If Len(name) < 8 Then Exit Function
+  If LCase(Left(name, 6)) <> "style_" Then Exit Function
+  base = Mid(name, 7)
+  IsStyleBookmarkName = (InStrRev(base, "_") > 1)
+End Function
+
+Function ExtractStyleName(bmName)
+  Dim base, pos
+  base = Mid(bmName, Len("style_") + 1)
+  pos = InStrRev(base, "_")
+  If pos = 0 Then
+    ExtractStyleName = ""
+    Exit Function
+  End If
+  base = Left(base, pos - 1)
+  base = Replace(base, "__", "_")
+  base = Replace(base, "_s", " ")
+  ExtractStyleName = base
+End Function
+
+Function TryGetStyle(doc, styleName)
+  Dim st
+  On Error Resume Next
+  Set st = doc.Styles(styleName)
+  If Err.Number <> 0 Then
+    Set st = Nothing
+    Err.Clear
+  End If
+  On Error GoTo 0
+  Set TryGetStyle = st
+End Function
+
+Sub ApplyStyleAtBookmark(doc, bmName, applied, failed)
+  Dim bm, st, styleName, rng, p
+
+  On Error Resume Next
+
+  Set bm = doc.Bookmarks(bmName)
+  If Err.Number <> 0 Then
+    LogMsg "WARN", "Style " & bmName & ": bookmark lost — " & Err.Description
+    Err.Clear
+    failed = failed + 1
+    Exit Sub
+  End If
+
+  styleName = ExtractStyleName(bmName)
+  Set st = TryGetStyle(doc, styleName)
+  If st Is Nothing Then
+    LogMsg "WARN", "Style " & bmName & ": no style [" & styleName & "] in document — skip"
+    failed = failed + 1
+    Exit Sub
+  End If
+
+  Set rng = bm.Range.Duplicate
+
+  Select Case st.Type
+    Case wdStyleTypeParagraph
+      For Each p In rng.Paragraphs
+        p.Range.Style = st
+      Next
+    Case wdStyleTypeCharacter
+      rng.Style = st
+    Case Else
+      LogMsg "WARN", "Style " & bmName & ": unsupported style type " & st.Type & " — skip"
+      failed = failed + 1
+      Exit Sub
+  End Select
+
+  If Err.Number <> 0 Then
+    LogMsg "ERROR", "Style " & bmName & " [" & styleName & "]: apply failed Err=" & Err.Number & " " & Err.Description
+    Err.Clear
+    failed = failed + 1
+    Exit Sub
+  End If
+
+  applied = applied + 1
+End Sub
+
+Sub ProcessStyleBookmarks(doc)
+  Dim bm, names(), count, i, applied, failed
+
+  count = 0
+  On Error Resume Next
+  For Each bm In doc.Bookmarks
+    If bm.Range.StoryType = wdMainTextStory Then
+      If IsStyleBookmarkName(bm.Name) Then
+        ReDim Preserve names(count)
+        names(count) = bm.Name
+        count = count + 1
+      End If
+    End If
+  Next
+  Err.Clear
+  On Error GoTo 0
+
+  LogMsg "INFO", "Style bookmarks found: " & count
+
+  applied = 0
+  failed = 0
+  For i = 0 To count - 1
+    ApplyStyleAtBookmark doc, names(i), applied, failed
+  Next
+
+  LogMsg "INFO", "Style bookmarks applied=" & applied & " skipped=" & failed
+End Sub
 
 Sub InsertPartsOnly(w, htmlDoc, doc)
   Dim names(), i, bmName
@@ -363,6 +471,17 @@ End If
 On Error GoTo 0
 LogMsg "INFO", "InsertPartsOnly end"
 CloseDoc htmlDoc, False
+
+LogMsg "INFO", "ProcessStyleBookmarks begin"
+On Error Resume Next
+ProcessStyleBookmarks doc
+If Err.Number <> 0 Then
+  LogMsg "ERROR", "ProcessStyleBookmarks aborted Err=" & Err.Number & " " & Err.Description & " — output still saved"
+  Err.Clear
+End If
+On Error GoTo 0
+LogMsg "INFO", "ProcessStyleBookmarks end"
+
 SaveDocAs doc, outDocx
 CloseDoc doc, False
 LogMsg "INFO", "Word COM: Quit"
