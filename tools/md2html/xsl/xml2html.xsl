@@ -45,6 +45,10 @@
         <xsl:text>Normal</xsl:text>
     </xsl:template>
 
+    <xsl:template match="thead/row/entry" mode="styleName">
+        <xsl:text>Заголовок таблицы</xsl:text>
+    </xsl:template>
+
     <xsl:template match="itemizedlist" mode="styleName">
         <xsl:text>Scroll List Bullet</xsl:text>
     </xsl:template>
@@ -68,11 +72,19 @@
 
         <xsl:param name="anchorContent"/>
 
+        <xsl:param name="anchorLabel"/>
+
         <xsl:param name="anchorName"/>
 
-        <a name="{$anchorName}">@#$$#@</a>
+        <a name="{$anchorName}">
+            <xsl:value-of select="$anchorLabel"/>
+        </a>
+        
         <xsl:copy-of select="$anchorContent"/>
-        <a name="{concat('_', $anchorName)}">@#$$#@</a>
+        
+        <a name="{concat('_', $anchorName)}">
+            <xsl:value-of select="$anchorLabel"/>
+        </a>
 
     </xsl:template>
 
@@ -96,9 +108,7 @@
 
         <xsl:param name="styleName"/>
 
-        <xsl:variable name="escapedStyleName" select="loc:escapeStyleName($styleName)"/>
-
-        <xsl:value-of select="concat('style_', $escapedStyleName, '_', generate-id($element))"/>
+        <xsl:value-of select="concat('style_', generate-id($element))"/>
 
     </xsl:function>
 
@@ -135,17 +145,19 @@
 
         <xsl:choose>
 
-            <xsl:when test="loc:hasStyleName(.)">
-
-                <xsl:variable name="styleAnchorName" select="loc:styleAnchorName(., $styleName)"/>
+            <xsl:when test="loc:hasStyleName(.)">                
 
                 <xsl:call-template name="anchorPair">
 
                     <xsl:with-param name="anchorContent">
                         <xsl:copy-of select="$anchorContent"/>
                     </xsl:with-param>
+                    
+                    <xsl:with-param name="anchorLabel">
+                        <xsl:value-of select="$styleName"/>
+                    </xsl:with-param>
 
-                    <xsl:with-param name="anchorName" select="$styleAnchorName"/>
+                    <xsl:with-param name="anchorName" select="concat('style_', generate-id(.))"/>
 
                 </xsl:call-template>
 
@@ -166,8 +178,6 @@
 
     <xsl:template match="node()[name() = '']">
         <xsl:copy-of select="."/>
-        
-        <!--<xsl:value-of select="normalize-space(.)"/>-->
     </xsl:template>
 
 
@@ -284,7 +294,21 @@
     <xsl:template match="thead/row/entry">
 
         <th>
-            <xsl:apply-templates/>
+            <xsl:apply-templates select="." mode="styleAnchor">
+
+                <xsl:with-param name="anchorContent">
+
+                    <p>
+                        <xsl:apply-templates/>
+                    </p>
+
+                </xsl:with-param>
+
+                <xsl:with-param name="styleName">
+                    <xsl:apply-templates select="." mode="styleName"/>
+                </xsl:with-param>
+
+            </xsl:apply-templates>
         </th>
 
     </xsl:template>
@@ -354,8 +378,10 @@
             <xsl:with-param name="anchorContent">
                 <xsl:apply-templates select="section[loc:isFrontmatter(.)]"/>
             </xsl:with-param>
+            
+            <xsl:with-param name="anchorLabel" select="'frontmatter'"/>
 
-            <xsl:with-param name="anchorName" select="'part_frontmatter'"/>
+            <xsl:with-param name="anchorName" select="'part_1'"/>
 
         </xsl:call-template>
 
@@ -364,8 +390,10 @@
             <xsl:with-param name="anchorContent">
                 <xsl:apply-templates select="section[not(loc:isFrontmatter(.))]"/>
             </xsl:with-param>
+            
+            <xsl:with-param name="anchorLabel" select="'main'"/>
 
-            <xsl:with-param name="anchorName" select="'part_main'"/>
+            <xsl:with-param name="anchorName" select="'part_2'"/>
 
         </xsl:call-template>
 
@@ -393,8 +421,10 @@
                 <xsl:with-param name="anchorContent">
                     <xsl:value-of select="."/>
                 </xsl:with-param>
+                
+                <xsl:with-param name="anchorLabel" select="@name"/>
 
-                <xsl:with-param name="anchorName" select="concat('part_', @name)"/>
+                <xsl:with-param name="anchorName" select="concat('part_', generate-id(.))"/>
 
             </xsl:call-template>
 
