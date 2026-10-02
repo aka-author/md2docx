@@ -338,6 +338,34 @@
     <xsl:template match="info"/>
 
 
+    <xsl:template name="metaProps">
+
+        <xsl:variable name="metaUri" select="
+                resolve-uri(
+                replace(tokenize(base-uri(/), '/')[last()], '\.xml$', '-meta.xml'),
+                base-uri(/))"/>
+
+        <xsl:variable name="meta" select="document($metaUri)"/>
+        
+        <xsl:for-each select="$meta//*[@name]">
+            
+            <xsl:call-template name="LFCR"/>
+                        
+            <xsl:element name="a">
+                
+                <xsl:attribute name="name">
+                    <xsl:value-of select="concat('part_', @name)"/>
+                </xsl:attribute>
+                
+                <xsl:value-of select="normalize-space(.)"/>
+                                        
+            </xsl:element>
+            
+        </xsl:for-each>
+
+    </xsl:template>
+
+
     <xsl:template match="article">
 
         <html>
@@ -345,6 +373,7 @@
                 <title/>
             </head>
             <body>
+                <xsl:call-template name="metaProps"/>
                 <xsl:apply-templates/>
             </body>
         </html>

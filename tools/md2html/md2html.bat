@@ -8,6 +8,14 @@ set mdDocFileName=%~n1
 
 echo Producing an interim HTML... 
 
+
+rem Extracting markdown metadata
+
+set metaXmlFilePath=%tmp%\%mdDocFileName%-meta.xml
+
+cscript "%mdmeta2xmlVbs%" "%mdDocFilePath%" "%metaXmlFilePath%"
+
+
 rem Producing an interim XML
 
 set xmlDocFilePath=%tmp%\%mdDocFileName%.xml

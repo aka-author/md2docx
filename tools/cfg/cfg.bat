@@ -7,6 +7,7 @@ set tmp=%root%\tmp
 
 set pandocExe=C:\Program Files\Pandoc\pandoc.exe
 
+set mdmeta2xmlVbs=%tools%\md2html\vbs\mdmeta2xml.vbs 
 set md2htmlBat=%tools%\md2html\md2html.bat
 set saxonJar=c:\Saxon\saxon9.jar 
 set xml2htmlXsl=%tools%\md2html\xsl\xml2html.xsl
