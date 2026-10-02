@@ -7,7 +7,7 @@ genre: Описание постановки задачи
 contract_number: 12345/АБЦ
 contract_date: 10.11.2026
 customer_role: Директор
-customer_unit: Департамента налогообложения животных
+customer_unit: Департамент налогообложения животных
 customer_FIO: Мышкин Л. Н.
 ---
 
