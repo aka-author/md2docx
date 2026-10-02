@@ -135,143 +135,80 @@ Sub SaveDocAs(doc, outPath)
   LogMsg "INFO", "Saved: " & outPath
 End Sub
 
-Function ReadTextFileUtf8(path)
-  Dim stream
-  LogMsg "INFO", "ReadTextFileUtf8: " & path
-  Set stream = CreateObject("ADODB.Stream")
-  stream.Type = 2
-  stream.Charset = "utf-8"
-  stream.Open
-  stream.LoadFromFile path
-  ReadTextFileUtf8 = stream.ReadText
-  stream.Close
-End Function
-
-Sub WriteTextFileUtf8(path, text)
-  Dim stream
-  Set stream = CreateObject("ADODB.Stream")
-  stream.Type = 2
-  stream.Charset = "utf-8"
-  stream.Open
-  stream.WriteText text
-  stream.SaveToFile path, 2
-  stream.Close
-End Sub
-
 Function IsPartBookmarkName(name)
   IsPartBookmarkName = (Len(name) >= 6 And LCase(Left(name, 5)) = "part_")
 End Function
 
-Function FindAnchorOpenTag(html, partName)
-  Dim patterns(2), i, p, tagEnd
-  patterns(0) = "<a name=""" & partName & """"
-  patterns(1) = "<a name=""" & partName & " """
-  patterns(2) = "<a name='" & partName & "'"
-  For i = 0 To 2
-    p = InStr(1, html, patterns(i), vbTextCompare)
-    If p > 0 Then
-      tagEnd = InStr(p, html, ">")
-      If tagEnd = 0 Then Exit Function
-      FindAnchorOpenTag = tagEnd + 1
-      Exit Function
+' Closing bookmark names start with "_", which Word treats as hidden:
+' Bookmarks.ShowHidden must be True to find them.
+Function CloseName(name)
+  CloseName = "_" & name
+End Function
+
+' Each service anchor holds MARKER so that Word imports it as a non-empty
+' bookmark and keeps it when the fragment is copied.
+Const MARKER = "@#$$#@"
+
+Function IsServiceBookmarkName(name)
+  Dim base
+  base = name
+  If Left(base, 1) = "_" Then base = Mid(base, 2)
+  IsServiceBookmarkName = IsPartBookmarkName(base) Or (LCase(Left(base, 6)) = "style_")
+End Function
+
+Function PairRange(doc, name)
+  Set PairRange = Nothing
+  If Not doc.Bookmarks.Exists(name) Then Exit Function
+  If Not doc.Bookmarks.Exists(CloseName(name)) Then Exit Function
+  Set PairRange = doc.Range(doc.Bookmarks(name).Range.Start, doc.Bookmarks(CloseName(name)).Range.End)
+End Function
+
+Sub RemoveMarkers(doc)
+  Dim bm, starts(), ends(), count, i, j, tmp, rng, para, removed, emptied
+
+  On Error Resume Next
+  count = 0
+  For Each bm In doc.Bookmarks
+    If IsServiceBookmarkName(bm.Name) Then
+      If doc.Range(bm.Range.Start, bm.Range.Start + Len(MARKER)).Text = MARKER Then
+        ReDim Preserve starts(count)
+        ReDim Preserve ends(count)
+        starts(count) = bm.Range.Start
+        ends(count) = bm.Range.Start + Len(MARKER)
+        count = count + 1
+      End If
     End If
   Next
-  FindAnchorOpenTag = 0
-End Function
-
-Function IsTagOpenA(html, pos)
-  Dim ch
-  If InStr(pos, html, "<a", vbTextCompare) <> pos Then
-    IsTagOpenA = False
-    Exit Function
-  End If
-  ch = LCase(Mid(html, pos + 2, 1))
-  IsTagOpenA = (ch = " " Or ch = ">" Or ch = vbCr Or ch = vbLf Or ch = "/")
-End Function
-
-Function FindAnchorClose(html, startContent)
-  Dim depth, i, openPos, closePos, closeTag
-  depth = 1
-  i = startContent
-  closeTag = "</a>"
-  FindAnchorClose = 0
-  Do While i <= Len(html) And depth > 0
-    openPos = InStr(i, html, "<a", vbTextCompare)
-    closePos = InStr(i, html, closeTag, vbTextCompare)
-    If closePos = 0 Then Exit Function
-    If openPos = 0 Or closePos < openPos Then
-      depth = depth - 1
-      If depth = 0 Then
-        FindAnchorClose = closePos
-        Exit Function
-      End If
-      i = closePos + Len(closeTag)
-    Else
-      If IsTagOpenA(html, openPos) Then depth = depth + 1
-      i = openPos + 2
-    End If
-  Loop
-End Function
-
-' Word imports <a name> around block content as an empty bookmark,
-' so the end of each part_ anchor content is marked by an empty pend_ anchor.
-Const PART_END_PREFIX = "pend_"
-
-Function PartEndName(partName)
-  PartEndName = PART_END_PREFIX & Mid(partName, 6)
-End Function
-
-Sub MarkPartEnds(htmlFile)
-  Dim html, marker, p, nameStart, nameEnd, contentStart, closePos
-  Dim names(), closes(), count, i, j, tmp
-  html = ReadTextFileUtf8(htmlFile)
-  marker = "<a name=""part_"
-  count = 0
-  p = InStr(1, html, marker, vbTextCompare)
-  Do While p > 0
-    nameStart = p + Len("<a name=""")
-    nameEnd = InStr(nameStart, html, """")
-    contentStart = InStr(nameEnd, html, ">") + 1
-    closePos = FindAnchorClose(html, contentStart)
-    If nameEnd > 0 And closePos > 0 Then
-      ReDim Preserve names(count)
-      ReDim Preserve closes(count)
-      names(count) = Mid(html, nameStart, nameEnd - nameStart)
-      closes(count) = closePos
-      count = count + 1
-    Else
-      LogMsg "WARN", "MarkPartEnds: no closing </a> for anchor at " & p
-    End If
-    p = InStr(p + 1, html, marker, vbTextCompare)
-  Loop
   For i = 0 To count - 2
     For j = i + 1 To count - 1
-      If closes(j) > closes(i) Then
-        tmp = closes(i): closes(i) = closes(j): closes(j) = tmp
-        tmp = names(i): names(i) = names(j): names(j) = tmp
+      If starts(j) > starts(i) Then
+        tmp = starts(i): starts(i) = starts(j): starts(j) = tmp
+        tmp = ends(i): ends(i) = ends(j): ends(j) = tmp
       End If
     Next
   Next
-  For i = 0 To count - 1
-    html = Left(html, closes(i) - 1) & "<a name=""" & PartEndName(names(i)) & """></a>" & Mid(html, closes(i))
-  Next
-  WriteTextFileUtf8 htmlFile, html
-  LogMsg "INFO", "MarkPartEnds: " & count & " part_ anchors marked"
-End Sub
 
-Sub RemovePartEndBookmarks(doc)
-  Dim bm, names(), count, i
-  count = 0
-  For Each bm In doc.Bookmarks
-    If LCase(Left(bm.Name, Len(PART_END_PREFIX))) = PART_END_PREFIX Then
-      ReDim Preserve names(count)
-      names(count) = bm.Name
-      count = count + 1
+  removed = 0
+  emptied = 0
+  For i = 0 To count - 1
+    Set rng = doc.Range(starts(i), ends(i))
+    If rng.Text = MARKER Then
+      Set para = rng.Paragraphs(1).Range
+      rng.Delete
+      removed = removed + 1
+      If Trim(Replace(para.Text, vbCr, "")) = "" Then
+        para.Delete
+        emptied = emptied + 1
+      End If
+    End If
+    If Err.Number <> 0 Then
+      LogMsg "ERROR", "RemoveMarkers at " & starts(i) & ": Err=" & Err.Number & " " & Err.Description
+      Err.Clear
     End If
   Next
-  For i = 0 To count - 1
-    doc.Bookmarks(names(i)).Delete
-  Next
+  On Error GoTo 0
+
+  LogMsg "INFO", "Markers removed=" & removed & " empty paragraphs removed=" & emptied
 End Sub
 
 Sub CollectPartBookmarkNamesDesc(doc, names)
@@ -307,7 +244,7 @@ Sub CollectPartBookmarkNamesDesc(doc, names)
 End Sub
 
 Sub PastePartFromHtmlDoc(w, htmlDoc, doc, partName)
-  Dim insertStart, insertEnd, srcStart, srcEnd, rng
+  Dim insertStart, insertEnd, src, rng
 
   On Error Resume Next
 
@@ -315,25 +252,32 @@ Sub PastePartFromHtmlDoc(w, htmlDoc, doc, partName)
     LogMsg "WARN", "Part " & partName & ": no bookmark in template — skip"
     Exit Sub
   End If
-  If Not htmlDoc.Bookmarks.Exists(partName) Or Not htmlDoc.Bookmarks.Exists(PartEndName(partName)) Then
-    LogMsg "WARN", "Part " & partName & ": no bookmark in opened HTML — skip"
+  Set src = PairRange(htmlDoc, partName)
+  If src Is Nothing Then
+    LogMsg "WARN", "Part " & partName & ": no bookmark pair " & partName & "/" & CloseName(partName) & " in opened HTML — skip"
     Exit Sub
   End If
 
   insertStart = doc.Bookmarks(partName).Range.Start
   insertEnd = doc.Bookmarks(partName).Range.End
+  LogMsg "INFO", "Part " & partName & ": src " & src.Start & ".." & src.End & " -> target " & insertStart & ".." & insertEnd
 
-  srcStart = htmlDoc.Bookmarks(partName).Range.Start
-  srcEnd = htmlDoc.Bookmarks(PartEndName(partName)).Range.Start
-  LogMsg "INFO", "Part " & partName & ": src " & srcStart & ".." & srcEnd & " -> target " & insertStart & ".." & insertEnd
-
-  If srcEnd <= srcStart Then
+  If src.End <= src.Start Then
     LogMsg "WARN", "Part " & partName & ": empty source range — skip"
     Exit Sub
   End If
 
+  ' A zone ending with a paragraph mark keeps it when the fragment does not end
+  ' with one; otherwise the fragment tail merges into the next template paragraph.
+  If insertEnd > insertStart Then
+    If doc.Range(insertEnd - 1, insertEnd).Text = vbCr And src.Characters.Last.Text <> vbCr Then
+      insertEnd = insertEnd - 1
+      LogMsg "INFO", "Part " & partName & ": template paragraph mark kept, target " & insertStart & ".." & insertEnd
+    End If
+  End If
+
   Set rng = doc.Range(insertStart, insertEnd)
-  rng.FormattedText = htmlDoc.Range(srcStart, srcEnd).FormattedText
+  rng.FormattedText = src.FormattedText
   If Err.Number <> 0 Then
     LogMsg "ERROR", "Part " & partName & ": insert failed Err=" & Err.Number & " " & Err.Description
     Err.Clear
@@ -387,14 +331,13 @@ Function TryGetStyle(doc, styleName)
 End Function
 
 Sub ApplyStyleAtBookmark(doc, bmName, applied, failed)
-  Dim bm, st, styleName, rng, p
+  Dim st, styleName, rng, p
 
   On Error Resume Next
 
-  Set bm = doc.Bookmarks(bmName)
-  If Err.Number <> 0 Then
-    LogMsg "WARN", "Style " & bmName & ": bookmark lost — " & Err.Description
-    Err.Clear
+  Set rng = PairRange(doc, bmName)
+  If rng Is Nothing Then
+    LogMsg "WARN", "Style " & bmName & ": no bookmark pair " & bmName & "/" & CloseName(bmName) & " — skip"
     failed = failed + 1
     Exit Sub
   End If
@@ -406,8 +349,6 @@ Sub ApplyStyleAtBookmark(doc, bmName, applied, failed)
     failed = failed + 1
     Exit Sub
   End If
-
-  Set rng = bm.Range.Duplicate
 
   Select Case st.Type
     Case wdStyleTypeParagraph
@@ -500,9 +441,10 @@ LogFileCheck "Template", inDocx
 Set w = CreateWord()
 workDocx = CopyForWordOpen(inDocx, "bookmarx_tpl")
 workHtml = CopyForWordOpen(htmlPath, "bookmarx_html")
-MarkPartEnds workHtml
 Set doc = OpenDoc(w, workDocx, False)
 Set htmlDoc = OpenDoc(w, workHtml, True)
+doc.Bookmarks.ShowHidden = True
+htmlDoc.Bookmarks.ShowHidden = True
 LogMsg "INFO", "Template+HTML opened from TEMP copies (same flow as PasteHtmlIntoDoc)"
 
 LogMsg "INFO", "InsertPartsOnly begin"
@@ -512,8 +454,6 @@ If Err.Number <> 0 Then
   LogMsg "ERROR", "InsertPartsOnly aborted Err=" & Err.Number & " " & Err.Description & " — output still saved"
   Err.Clear
 End If
-RemovePartEndBookmarks doc
-Err.Clear
 On Error GoTo 0
 LogMsg "INFO", "InsertPartsOnly end"
 CloseDoc htmlDoc, False
@@ -527,6 +467,8 @@ If Err.Number <> 0 Then
 End If
 On Error GoTo 0
 LogMsg "INFO", "ProcessStyleBookmarks end"
+
+RemoveMarkers doc
 
 SaveDocAs doc, outDocx
 CloseDoc doc, False

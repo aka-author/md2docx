@@ -64,6 +64,19 @@
         Assembling anchore names for output styles 
     -->
 
+    <xsl:template name="anchorPair">
+
+        <xsl:param name="anchorContent"/>
+
+        <xsl:param name="anchorName"/>
+
+        <a name="{$anchorName}">@#$$#@</a>
+        <xsl:copy-of select="$anchorContent"/>
+        <a name="{concat('_', $anchorName)}">@#$$#@</a>
+
+    </xsl:template>
+
+
     <xsl:function name="loc:escapeStyleName">
 
         <xsl:param name="styleName"/>
@@ -116,20 +129,30 @@
 
     <xsl:template match="*" mode="styleAnchor">
 
-        <xsl:param name="content"/>
+        <xsl:param name="anchorContent"/>
 
         <xsl:param name="styleName"/>
 
         <xsl:choose>
 
             <xsl:when test="loc:hasStyleName(.)">
-                <a name="{loc:styleAnchorName(., $styleName)}">
-                    <xsl:copy-of select="$content"/>
-                </a>
+
+                <xsl:variable name="styleAnchorName" select="loc:styleAnchorName(., $styleName)"/>
+
+                <xsl:call-template name="anchorPair">
+
+                    <xsl:with-param name="anchorContent">
+                        <xsl:copy-of select="$anchorContent"/>
+                    </xsl:with-param>
+
+                    <xsl:with-param name="anchorName" select="$styleAnchorName"/>
+
+                </xsl:call-template>
+
             </xsl:when>
 
             <xsl:otherwise>
-                <xsl:copy-of select="$content"/>
+                <xsl:copy-of select="$anchorContent"/>
             </xsl:otherwise>
 
         </xsl:choose>
@@ -142,7 +165,9 @@
     -->
 
     <xsl:template match="node()[name() = '']">
-        <xsl:value-of select="normalize-space(.)"/>
+        <xsl:copy-of select="."/>
+        
+        <!--<xsl:value-of select="normalize-space(.)"/>-->
     </xsl:template>
 
 
@@ -175,7 +200,7 @@
 
         <xsl:apply-templates select="." mode="styleAnchor">
 
-            <xsl:with-param name="content">
+            <xsl:with-param name="anchorContent">
                 <ol>
                     <xsl:apply-templates/>
                 </ol>
@@ -194,7 +219,7 @@
 
         <xsl:apply-templates select="." mode="styleAnchor">
 
-            <xsl:with-param name="content">
+            <xsl:with-param name="anchorContent">
                 <ul>
                     <xsl:apply-templates/>
                 </ul>
@@ -213,7 +238,7 @@
 
         <xsl:apply-templates select="." mode="styleAnchor">
 
-            <xsl:with-param name="content">
+            <xsl:with-param name="anchorContent">
                 <p>
                     <xsl:apply-templates/>
                 </p>
@@ -232,7 +257,7 @@
 
         <xsl:apply-templates select="." mode="styleAnchor">
 
-            <xsl:with-param name="content">
+            <xsl:with-param name="anchorContent">
                 <xsl:element name="{concat('h', loc:level(.))}">
                     <xsl:apply-templates/>
                 </xsl:element>
@@ -324,13 +349,25 @@
 
     <xsl:template match="article/section">
 
-        <a name="part_frontmatter">
-            <xsl:apply-templates select="section[loc:isFrontmatter(.)]"/>
-        </a>
+        <xsl:call-template name="anchorPair">
 
-        <a name="part_main">
-            <xsl:apply-templates select="section[not(loc:isFrontmatter(.))]"/>
-        </a>
+            <xsl:with-param name="anchorContent">
+                <xsl:apply-templates select="section[loc:isFrontmatter(.)]"/>
+            </xsl:with-param>
+
+            <xsl:with-param name="anchorName" select="'part_frontmatter'"/>
+
+        </xsl:call-template>
+
+        <xsl:call-template name="anchorPair">
+
+            <xsl:with-param name="anchorContent">
+                <xsl:apply-templates select="section[not(loc:isFrontmatter(.))]"/>
+            </xsl:with-param>
+
+            <xsl:with-param name="anchorName" select="'part_main'"/>
+
+        </xsl:call-template>
 
     </xsl:template>
 
@@ -346,21 +383,21 @@
                 base-uri(/))"/>
 
         <xsl:variable name="meta" select="document($metaUri)"/>
-        
+
         <xsl:for-each select="$meta//*[@name]">
-            
+
             <xsl:call-template name="LFCR"/>
-                        
-            <xsl:element name="a">
-                
-                <xsl:attribute name="name">
-                    <xsl:value-of select="concat('part_', @name)"/>
-                </xsl:attribute>
-                
-                <xsl:value-of select="normalize-space(.)"/>
-                                        
-            </xsl:element>
-            
+
+            <xsl:call-template name="anchorPair">
+
+                <xsl:with-param name="anchorContent">
+                    <xsl:value-of select="."/>
+                </xsl:with-param>
+
+                <xsl:with-param name="anchorName" select="concat('part_', @name)"/>
+
+            </xsl:call-template>
+
         </xsl:for-each>
 
     </xsl:template>
