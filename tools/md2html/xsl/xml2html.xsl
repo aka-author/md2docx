@@ -11,8 +11,8 @@
         Utilities
     -->
 
-    <xsl:template name="LFCR">
-        <xsl:text>&#10;&#13;</xsl:text>
+    <xsl:template name="CRLF">
+        <xsl:text>&#13;&#10;</xsl:text>
     </xsl:template>
 
 
@@ -79,9 +79,9 @@
         <a name="{$anchorName}">
             <xsl:value-of select="$anchorLabel"/>
         </a>
-        
+
         <xsl:copy-of select="$anchorContent"/>
-        
+
         <a name="{concat('_', $anchorName)}">
             <xsl:value-of select="$anchorLabel"/>
         </a>
@@ -145,14 +145,14 @@
 
         <xsl:choose>
 
-            <xsl:when test="loc:hasStyleName(.)">                
+            <xsl:when test="loc:hasStyleName(.)">
 
                 <xsl:call-template name="anchorPair">
 
                     <xsl:with-param name="anchorContent">
                         <xsl:copy-of select="$anchorContent"/>
                     </xsl:with-param>
-                    
+
                     <xsl:with-param name="anchorLabel">
                         <xsl:value-of select="$styleName"/>
                     </xsl:with-param>
@@ -378,7 +378,7 @@
             <xsl:with-param name="anchorContent">
                 <xsl:apply-templates select="section[loc:isFrontmatter(.)]"/>
             </xsl:with-param>
-            
+
             <xsl:with-param name="anchorLabel" select="'frontmatter'"/>
 
             <xsl:with-param name="anchorName" select="'part_1'"/>
@@ -390,7 +390,7 @@
             <xsl:with-param name="anchorContent">
                 <xsl:apply-templates select="section[not(loc:isFrontmatter(.))]"/>
             </xsl:with-param>
-            
+
             <xsl:with-param name="anchorLabel" select="'main'"/>
 
             <xsl:with-param name="anchorName" select="'part_2'"/>
@@ -414,14 +414,14 @@
 
         <xsl:for-each select="$meta//*[@name]">
 
-            <xsl:call-template name="LFCR"/>
+            <xsl:call-template name="CRLF"/>
 
             <xsl:call-template name="anchorPair">
 
                 <xsl:with-param name="anchorContent">
                     <xsl:value-of select="."/>
                 </xsl:with-param>
-                
+
                 <xsl:with-param name="anchorLabel" select="@name"/>
 
                 <xsl:with-param name="anchorName" select="concat('part_', generate-id(.))"/>
@@ -437,7 +437,9 @@
 
         <html>
             <head>
-                <title/>
+                <title>                    
+                    <xsl:value-of select="section/title"/>
+                </title>
             </head>
             <body>
                 <xsl:call-template name="metaProps"/>
@@ -473,7 +475,7 @@
     <xsl:template match="/">
 
         <xsl:call-template name="doctypeHtml5"/>
-        <xsl:call-template name="LFCR"/>
+        <xsl:call-template name="CRLF"/>
 
         <xsl:apply-templates/>
 

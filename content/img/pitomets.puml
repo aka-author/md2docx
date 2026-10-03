@@ -1,0 +1,60 @@
+@startuml pitomets
+title Исчисление налога на питомца за период
+
+skinparam activity {
+  BackgroundColor #FEFECE
+  BorderColor #A80036
+  FontName Arial
+}
+skinparam note {
+  BackgroundColor #FFFFCC
+  BorderColor #999999
+}
+
+start
+
+note right
+  Вход: ИНН ФЛ, питомцы,
+  date_from..date_to, version_rates
+end note
+
+:Загрузить профиль ФЛ и список активных\nзаписей РДП на период;
+
+:Определить регион R по адресу регистрации\nна последнюю дату периода;
+
+:Загрузить базовую ставку B(R),\nправило округления и минимум MIN(R);
+
+partition "По каждому питомцу" {
+  :Вычислить K_time = (дни содержания в периоде)\n/ (дни периода);
+}
+
+:Сгруппировать питомцев по виду;\nдля каждой группы назначить n = 1, 2, …;
+
+while (Есть необработанный питомец i?) is (да)
+  :C_species = коэффициент вида;
+  if (n = 1?) then (да)
+    :C_multi = 1;
+  else (нет)
+    :C_multi из MULTI_PET_RULE (R, вид, n);
+  endif
+  :L = коэффициент льготы (0…1)\nс учётом лимита питомцев по льготе;
+  :Amount_i = B(R) × C_species × C_multi × K_time × L;
+endwhile (нет)
+
+:Суммировать Amount_i;\nприменить округление региона;
+
+if (Сумма < MIN(R)\nи льгота не полная?) then (да)
+  :Установить MIN(R);
+else (нет)
+endif
+
+:Записать PET_TAX_ACCRUAL и CALC_PROTOCOL\nс расшифровкой множителей по питомцам;
+
+note right
+  Постусловие: идемпотентность
+  при том же ключе расчёта
+end note
+
+stop
+
+@enduml

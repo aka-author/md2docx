@@ -13,6 +13,8 @@ set htmlDocFilePath=%tmp%\%srcDocFileName%.html
 
 call "%md2htmlBat%" "%srcDocFilePath%" "%htmlDocFilePath%"
 
+call "%convimgBat%"
+
 set docxTemplateFilePath=%~dpnx2
 set "docxDocFolderPath=%~3\"
 set docxDocFilePath=%docxDocFolderPath%%srcDocFileName%.docx
